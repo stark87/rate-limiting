@@ -1,13 +1,11 @@
 package com.example.rate.limiting.component;
 
 import lombok.Getter;
-import lombok.Setter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 
 @ControllerAdvice
 @Getter
-@Setter
 public class PropsReader {
 
     @Value("${settings.use.sliding.window.rate.limiting}")

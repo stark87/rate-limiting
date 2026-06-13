@@ -1,5 +1,6 @@
 package com.example.rate.limiting.component;
 
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
@@ -15,8 +16,12 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class AsyncComponent {
     private final PropsReader propsReader;
+    private int rateLimitWindowSeconds;
 
-    private final int rateLimitWindowSeconds = propsReader.getRateLimitWindowSeconds();
+    @PostConstruct
+    void init (){
+        rateLimitWindowSeconds = propsReader.getRateLimitWindowSeconds();
+    }
 
     @Async
     public void evictCache(ConcurrentMap<String, List<Long>> map, String key){
