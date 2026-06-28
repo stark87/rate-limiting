@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.servlet.HandlerExceptionResolver;
@@ -24,6 +25,11 @@ import java.util.concurrent.ConcurrentHashMap;
 @Component
 @Slf4j
 @RequiredArgsConstructor
+@ConditionalOnProperty(
+        name = "feature.default.rate-limiting.enabled",
+        havingValue = "true",
+        matchIfMissing = false
+)
 public class RateLimitingFilter extends OncePerRequestFilter {
     private final PropsReader propsReader;
     @Qualifier("handlerExceptionResolver")
@@ -102,7 +108,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
         });
     }
 
-    private static void logError(String apiKey, long rateCount) {
+    public static void logError(String apiKey, long rateCount) {
         log.error("RateLimitExceededException, API Key: {}; Rate: {}", apiKey, rateCount);
     }
 }
