@@ -16,4 +16,10 @@ public class PropsReader {
 
     @Value("${settings.rate.limit.window.seconds}")
     private int rateLimitWindowSeconds;
+
+    @Value("${settings.token.refill.per.second}")
+    private int tokenRefillPerSecond;
+
+    @Value("${settings.use.scheduled.refiller}")
+    private boolean useScheduledRefiller;
 }

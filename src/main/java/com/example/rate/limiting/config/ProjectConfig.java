@@ -9,12 +9,14 @@ import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import java.util.concurrent.Executor;
 
 @Configuration
 @EnableAsync
+@EnableScheduling
 public class ProjectConfig {
 
     @Bean(name = "taskExecutor")
@@ -43,7 +45,7 @@ public class ProjectConfig {
         return redisTemplate;
     }
 
-    @Bean
+    @Bean("incrementScript")
     public RedisScript<Long> incrementScript() {
         DefaultRedisScript<Long> script = new DefaultRedisScript<>();
         script.setLocation(
