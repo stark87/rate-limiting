@@ -11,7 +11,7 @@ export const options = {
         fixed: {
             executor: 'per-vu-iterations',
             vus: 3,
-            iterations: 105,
+            iterations: 115,
         },
     },
 };

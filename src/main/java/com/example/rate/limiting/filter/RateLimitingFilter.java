@@ -26,9 +26,8 @@ import java.util.concurrent.ConcurrentHashMap;
 @Slf4j
 @RequiredArgsConstructor
 @ConditionalOnProperty(
-        name = "feature.default.rate-limiting.enabled",
-        havingValue = "true",
-        matchIfMissing = false
+        name = "feature.rate.limiting.filter",
+        havingValue = "default"
 )
 public class RateLimitingFilter extends OncePerRequestFilter {
     private final PropsReader propsReader;

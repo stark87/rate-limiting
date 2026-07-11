@@ -3,13 +3,14 @@ package com.example.rate.limiting.filter;
 import com.example.rate.limiting.component.PropsReader;
 import com.example.rate.limiting.exception.MissingHeaderException;
 import com.example.rate.limiting.exception.RateLimitExceededException;
+import jakarta.annotation.Nonnull;
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NonNull;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -18,65 +19,64 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.servlet.HandlerExceptionResolver;
 
-import java.time.Instant;
+import java.io.IOException;
 import java.util.Collections;
-import java.util.UUID;
 
 import static com.example.rate.limiting.filter.RateLimitingFilter.logError;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
-@Slf4j
 @ConditionalOnProperty(
         name = "feature.rate.limiting.filter",
-        havingValue = "redis"
+        havingValue = "token-bucket"
 )
-public class RedisRateLimitingFilter extends OncePerRequestFilter {
+public class TokenBucketRateLimitFilter extends OncePerRequestFilter {
     private final PropsReader propsReader;
-    private final RedisTemplate<String, Object> redisTemplate;
-    @Qualifier("incrementScript")
-    private final RedisScript<Long> incrementScript;
+    private final RedisTemplate<String, String> redisTemplate;
+    @Qualifier("tokenBucketScript")
+    private final RedisScript<Long> tokenBucketScript;
+    @Qualifier("lazyRefillScript")
+    private final RedisScript<Void> lazyRefillScript;
     @Qualifier("handlerExceptionResolver")
     private final HandlerExceptionResolver resolver;
 
-
     private int rateLimit;
-    private int rateLimitWindowSeconds;
+    private int refillRate;
 
     @PostConstruct
     void init (){
         rateLimit = propsReader.getRateLimit();
-        rateLimitWindowSeconds = propsReader.getRateLimitWindowSeconds();
+        refillRate = propsReader.getTokenRefillPerSecond();
     }
 
     @Override
-    protected void doFilterInternal(@NonNull HttpServletRequest request, @NonNull HttpServletResponse response, @NonNull FilterChain filterChain) {
-        try {
+    protected void doFilterInternal(@Nonnull HttpServletRequest request, @Nonnull HttpServletResponse response, @Nonnull FilterChain filterChain) throws ServletException, IOException {
+        try{
             String apiKey = request.getHeader("X-Api-Key");
             if (apiKey == null) {
                 throw new MissingHeaderException("X-Api-Key header is missing");
             }
 
-            Instant instant = Instant.now();
-            long now = instant.getEpochSecond();
-            long lbound = instant.minusSeconds(rateLimitWindowSeconds).getEpochSecond();
-
-            Long count = increment(formatKey(apiKey), now, lbound);
-            if (count != null && count > rateLimit) {
-                logError(apiKey, count);
-                throw new RateLimitExceededException();
+            if (!propsReader.isUseScheduledRefiller()){
+                lazyRefill(apiKey);
+            } else {
+                redisTemplate.opsForSet().add("keys", apiKey);
             }
-            filterChain.doFilter(request, response);
-        }catch (Exception e){
+
+            long tokenCount = redisTemplate.execute(tokenBucketScript, Collections.singletonList(apiKey), String.valueOf(rateLimit));
+            if (tokenCount < 0) {
+                logError(apiKey, tokenCount);
+                throw new RateLimitExceededException("Rate limit exceeded");
+            }
+
+        } catch (Exception e) {
             resolver.resolveException(request, response, null, e);
         }
+        filterChain.doFilter(request, response);
     }
 
-    private Long increment (String key, long timestamp, long lbound) {
-        return redisTemplate.execute(incrementScript, Collections.singletonList(key), UUID.randomUUID().toString(), String.valueOf(timestamp), String.valueOf(lbound));
-    }
-
-    private String formatKey(String apiKey) {
-        return "rate_limit:" + apiKey;
+    private void lazyRefill(String apiKey){
+        redisTemplate.execute(lazyRefillScript, Collections.singletonList(apiKey), String.valueOf(rateLimit), String.valueOf(refillRate));
     }
 }
