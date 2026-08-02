@@ -2,11 +2,9 @@ package com.example.rate.limiting.filter;
 
 import com.example.rate.limiting.component.PropsReader;
 import com.example.rate.limiting.exception.MissingHeaderException;
-import com.example.rate.limiting.exception.RateLimitExceededException;
 import jakarta.annotation.Nonnull;
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.FilterChain;
-import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -15,11 +13,11 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.script.RedisScript;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.servlet.HandlerExceptionResolver;
 
-import java.io.IOException;
 import java.util.Collections;
 
 import static com.example.rate.limiting.filter.RateLimitingFilter.logError;
@@ -51,7 +49,7 @@ public class TokenBucketRateLimitFilter extends OncePerRequestFilter {
     }
 
     @Override
-    protected void doFilterInternal(@Nonnull HttpServletRequest request, @Nonnull HttpServletResponse response, @Nonnull FilterChain filterChain) throws ServletException, IOException {
+    protected void doFilterInternal(@Nonnull HttpServletRequest request, @Nonnull HttpServletResponse response, @Nonnull FilterChain filterChain) {
         try{
             String apiKey = request.getHeader("X-Api-Key");
             if (apiKey == null) {
@@ -64,16 +62,19 @@ public class TokenBucketRateLimitFilter extends OncePerRequestFilter {
                 redisTemplate.opsForSet().add("keys", apiKey);
             }
 
-            long tokenCount = redisTemplate.execute(tokenBucketScript, Collections.singletonList(apiKey), String.valueOf(rateLimit));
-            if (tokenCount < 0) {
-                logError(apiKey, tokenCount);
-                throw new RateLimitExceededException("Rate limit exceeded");
+            long tokenRemaining = redisTemplate.execute(tokenBucketScript, Collections.singletonList(apiKey), String.valueOf(rateLimit));
+            if (tokenRemaining < 0) {
+                logError(apiKey, tokenRemaining);
+                response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
+                response.setHeader("X-Rate-Limit-Retry-After-Nano-Seconds", String.valueOf(5_000_000_000L));
+                response.getWriter().write("{\"error\": \"Rate limit exceeded\"}");
+            } else {
+                response.setHeader("X-Rate-Limit-Remaining", String.valueOf(tokenRemaining));
+                filterChain.doFilter(request, response);
             }
-
         } catch (Exception e) {
             resolver.resolveException(request, response, null, e);
         }
-        filterChain.doFilter(request, response);
     }
 
     private void lazyRefill(String apiKey){

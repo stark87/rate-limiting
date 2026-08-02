@@ -24,7 +24,7 @@ public class TokenBucketRefiller {
     private final RedisScript<Long> refillerScript;
     private final PropsReader propsReader;
 
-    @Scheduled(fixedRate = 20, timeUnit = TimeUnit.SECONDS)
+    @Scheduled(fixedRate = 5, timeUnit = TimeUnit.SECONDS)
     public void refillTokenBuckets(){
         Set<String> keys = redisTemplate.opsForSet().members("keys");
         if (keys == null || keys.isEmpty()) return;
