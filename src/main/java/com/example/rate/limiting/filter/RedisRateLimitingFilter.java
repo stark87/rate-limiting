@@ -59,8 +59,13 @@ public class RedisRateLimitingFilter extends OncePerRequestFilter {
             if (count != null && count > rateLimit) {
                 logError(apiKey, count);
                 throw new RateLimitExceededException();
+            } else {
+                if (count != null) {
+                    long tokenRemaining = Math.min(0, rateLimit - count);
+                    response.setHeader("X-Rate-Limit-Remaining", String.valueOf(tokenRemaining));
+                }
+                filterChain.doFilter(request, response);
             }
-            filterChain.doFilter(request, response);
         }catch (Exception e){
             resolver.resolveException(request, response, null, e);
         }
