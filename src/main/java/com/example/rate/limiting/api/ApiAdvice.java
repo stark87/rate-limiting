@@ -20,10 +20,10 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 public class ApiAdvice {
 
     @ExceptionHandler(MissingHeaderException.class)
-    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+    @ResponseStatus(HttpStatus.UNAUTHORIZED)
     @ResponseBody
     ResponseEntity<Response> handleMissingHeaderException(MissingHeaderException ex) {
-        return new ResponseEntity<>(new Response(ex.getMessage()), HttpStatus.BAD_REQUEST);
+        return new ResponseEntity<>(new Response(ex.getMessage()), HttpStatus.UNAUTHORIZED);
     }
 
     @ExceptionHandler(RateLimitExceededException.class)

@@ -14,6 +14,9 @@ public class PropsReader {
     @Value("${settings.rate.limit}")
     private int rateLimit;
 
+    @Value("${settings.burst.rate.limit}")
+    public int burstRateLimit;
+
     @Value("${settings.rate.limit.window.seconds}")
     private int rateLimitWindowSeconds;
 
